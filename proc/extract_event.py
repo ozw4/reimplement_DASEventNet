@@ -7,6 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 
 def extract_2s_window(
@@ -105,18 +106,23 @@ preprocessed_files_time = np.array(preprocessed_files_time)
 
 resample_dir = Path('/workspace/data/silixa/raw_78B_npy')
 extract_events = []
-for i, time in enumerate(event_times):
+for i, time in tqdm(enumerate(event_times)):
 	idx = np.where(
-		(preprocessed_files_time < time)
-		& (preprocessed_files_time + timedelta(seconds=15) >= time)
+		(preprocessed_files_time <= time)
+		& (preprocessed_files_time + timedelta(seconds=15) > time)
 	)[0]
+	if len(idx) == 0:
+		print(f'No matching file for event at {time}. Skipping.')
+		continue
 	t = pd.Timestamp(preprocessed_files_time[idx][0])
-	file = f'FORGE_DFIT_UTC_{t:%Y%m%d_%H%M%S}.202_1kHz.npy'
+	id = preprocessed_files[idx][0].stem.split('.')[-1][:3]
+	file = f'FORGE_DFIT_UTC_{t:%Y%m%d_%H%M%S}.{id}_1kHz.npy'
+
 	data = np.load(resample_dir / file)
 
 	extract_data = extract_2s_window(data, t, time, seed=None)
-
-	if i < 20:
+	extract_data = extract_data.astype(np.float32)
+	if i % 100 == 0:
 		plt.figure()
 		plt.imshow(extract_data, aspect='auto', vmin=-1, vmax=1, cmap='seismic')
 		plt.title(time.strftime('%Y-%m-%d %H:%M:%S'))
@@ -127,4 +133,11 @@ for i, time in enumerate(event_times):
 		plt.clf()
 		plt.close()
 	extract_events.append(extract_data)
+extract_events = np.array(extract_events)
+np.save(
+	'/workspace/data/extract_event_2s.npy',
+	extract_events,
+)
+
+
 # %%

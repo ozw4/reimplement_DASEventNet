@@ -3,8 +3,10 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 event_file = ''
 event_df = pd.read_csv(
@@ -19,7 +21,10 @@ event_df = pd.read_csv(
 event_df['time'] = pd.to_datetime(event_df['time'])
 
 data_dir = '/workspace/data/silixa'
-tdms_files = np.sort(list(Path(data_dir).glob('*.tdms')))
+
+preprocessed_dir = '/workspace/data/silixa/raw_78B_npy'
+preprocessed_files = np.sort(list(Path(preprocessed_dir).glob('*.npy')))
+
 
 event_times = pd.to_datetime(event_df['time'])
 
@@ -29,7 +34,7 @@ pattern = re.compile(r'UTC_(\d{8})_(\d{6})')
 # イベントを含まないTDMSファイルのリスト
 no_event_files = []
 event_files = []
-for path in tdms_files:
+for path in preprocessed_files:
 	m = pattern.search(path.name)
 	if not m:
 		continue  # パースできなかった場合はスキップ
@@ -53,8 +58,30 @@ for path in tdms_files:
 		event_files.append(path)
 
 resample_dir = Path(data_dir) / 'raw_78B_npy'
-for _ in range(len(event_times)):
-	file = np.random.choice(event_files)
-	file = file.stem + '_1kHz.npy'
+window_size = 2000  # 2秒分のサンプル数（1kHzサンプリング）
+extract_noise = []
+num_silixa_event = 1309
+
+for i in tqdm(range(num_silixa_event)):
+	file = np.random.choice(no_event_files)
+	# file = file.stem + '_1kHz.npy'
 	data = np.load(resample_dir / file)
-	sys.exit()
+	random_idx = np.random.randint(0, data.shape[1] - window_size + 1)
+	extract_data = data[:, random_idx : random_idx + window_size].astype(np.float32)
+	extract_noise.append(extract_data)
+	if i % 100 == 0:
+		plt.figure()
+		plt.imshow(extract_data, aspect='auto', vmin=-1, vmax=1, cmap='seismic')
+		# plt.title(time.strftime('%Y-%m-%d %H:%M:%S'))
+		plt.savefig(f'/workspace/image/extract_noise/{i}.png')
+		plt.cla()
+		plt.clf()
+		plt.close()
+extract_noise = np.array(extract_noise)
+np.save(
+	'/workspace/data/extract_noise_2s.npy',
+	extract_noise,
+)
+
+
+# %%
