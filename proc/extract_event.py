@@ -139,5 +139,9 @@ np.save(
 	extract_events,
 )
 
+np.save(
+	'/workspace/data/extract_event_time.npy',
+	event_times,
+)
 
 # %%

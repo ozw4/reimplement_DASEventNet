@@ -22,10 +22,14 @@ np.sort(nptdms_files)
 for nptdms_file in nptdms_files:
 	# check already resampled file
 	if Path.Path.exists(data_dir / 'raw_78B_npy' / (nptdms_file.stem + '_1kHz.npy')):
-		print(f'File {nptdms_file.name} already processed.')
+		# print(f'File {nptdms_file.name} already processed.')
 		continue
-	tdms_file = TdmsFile.read(nptdms_file)
-
+	print(f'Processing file: {nptdms_file.name}')
+	try:
+		tdms_file = TdmsFile.read(nptdms_file)
+	except Exception as e:
+		print(f'Error reading {nptdms_file.name}: {e}')
+		continue
 	# 'Measurement' グループ内のすべてのチャンネル名を取得
 	group = tdms_file['Measurement']
 	channel_names = group.channels()
@@ -33,9 +37,8 @@ for nptdms_file in nptdms_files:
 	# 各チャンネルをNumPy配列としてまとめて取得（辞書形式 or 配列形式）
 	channel_data_dict = {ch.name: ch.data for ch in channel_names}
 
-	# または、2D NumPy配列として整形（チャンネル数 × データ長）
 	seis = np.vstack([ch.data for ch in channel_names])
-	print(seis.shape)
+	# print(seis.shape)
 
 	# extract using silixa processed sgy info
 	seis78A = seis[69:1079]  # CH 70:1079
@@ -49,7 +52,11 @@ for nptdms_file in nptdms_files:
 		seis78B.astype(np.float32), up=1, down=4, axis=1
 	)
 
+	filtered_seis78B = bandpass_filter(downsampled_seis78B, fs=1000)
+	median_per_sample = np.median(filtered_seis78B, axis=0)  # shape = (n_samples,)
+	denoised_seis78B = filtered_seis78B - median_per_sample
+
 	savename = str(nptdms_file.stem) + '_1kHz.npy'
-	np.save(data_dir / 'raw_78B_npy' / savename, downsampled_seis78B)
-	sys.exit()
+	np.save(data_dir / 'raw_78B_npy' / savename, denoised_seis78B)
+	# sys.exit()
 # %%

@@ -49,7 +49,8 @@ denoised_seis78B = filtered_seis78B - median_per_sample
 
 
 savename = str(nptdms_file.stem) + '_1kHz.npy'
-
+savename = str(nptdms_file.stem) + '_1kHz.npy'
+np.save(data_dir / 'raw_78B_npy' / savename, denoised_seis78B)
 # visualize
 scale = 2.0
 import matplotlib.pyplot as plt
