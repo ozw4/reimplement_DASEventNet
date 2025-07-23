@@ -14,10 +14,10 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from build_model import build_model
 from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
-from torchvision.models import resnet50
 
 # ---------------------------
 # Torch Dataset & Model
@@ -38,18 +38,6 @@ class WaveformDataset(Dataset):
 		x = torch.from_numpy(self.data[idx]).unsqueeze(0)  # (1, H, W)
 		y = torch.tensor(self.labels[idx])
 		return x, y
-
-
-def build_model(input_channels: int = 1) -> nn.Module:
-	"""ResNet‑50 encoder with custom first conv and sigmoid output."""
-	model = resnet50(weights=None)
-	# Adapt first conv layer to 1 channel
-	model.conv1 = nn.Conv2d(
-		input_channels, 64, kernel_size=7, stride=2, padding=3, bias=False
-	)
-	# Replace final FC for binary classification
-	model.fc = nn.Sequential(nn.Flatten(), nn.Linear(2048, 1))
-	return model
 
 
 # ---------------------------
