@@ -173,19 +173,11 @@ noise_file = data_dir + '/extract_noise_2s.npy'
 event_data = np.load(event_file)
 noise_data = np.load(noise_file)
 
+save_dir = Path('/workspace/output/train')
+
 # reverse the order of event new_event first
 event_data = event_data[::-1]
 noise_data = noise_data[::-1]
-#
-# scaling (trace normalization)
-event_data = (event_data - np.mean(event_data, axis=2, keepdims=True)) / np.std(
-	event_data, axis=2, keepdims=True
-)
-noise_data = (noise_data - np.mean(noise_data, axis=2, keepdims=True)) / np.std(
-	noise_data, axis=2, keepdims=True
-)
-
-save_dir = Path('/workspace/output/_test_train_norm')
 
 n = 0
 test_range = (n, n + 130)  # 10%
@@ -247,9 +239,14 @@ test_loader = DataLoader(
 )
 
 # Model & device
-device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = build_model().to(device)
+total_params = sum(p.numel() for p in model.parameters())
+# 学習可能なパラメータ数（requires_grad=True のみ）
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+print(f'総パラメータ数: {total_params:,}')
+print(f'学習可能パラメータ数: {trainable_params:,}')
 # Train
 train(model, (train_loader, valid_loader), device, save_dir)
 
@@ -259,7 +256,7 @@ model.load_state_dict(torch.load(save_dir / 'best_model.pth', map_location=devic
 for split_name, loader in [
 	('train', train_loader),
 	('test', test_loader),
-	('valid', valid_loader),
+	('eval', valid_loader),
 ]:
 	loss, acc = evaluate(model, loader, device)
 	print(f'{split_name.capitalize()} – Loss: {loss:.4f} | Acc: {acc:.4f}')

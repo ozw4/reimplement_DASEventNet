@@ -86,7 +86,7 @@ np.save(
 # compress saved file for colab
 np.savez_compressed(
 	'/workspace/data/extract_noise_2s.npz',
-	extract_noise=extract_noise,
+	extract_noise=extract_noise.astype(np.float16),
 )
 
 # %%

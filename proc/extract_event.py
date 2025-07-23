@@ -80,7 +80,6 @@ event_df = pd.read_csv(
 )
 
 event_df['File Timestamp (UTC)'] = pd.to_datetime(event_df['File Timestamp (UTC)'])
-
 event_times = pd.to_datetime(event_df['File Timestamp (UTC)'], utc=True)
 
 # 時刻を抽出する正規表現パターン
@@ -144,4 +143,9 @@ np.save(
 	event_times,
 )
 
+#  saved float16 file for colab
+np.save(
+	'/workspace/data/extract_event_2s_float16.npy',
+	extract_events.astype(np.float16),
+)
 # %%

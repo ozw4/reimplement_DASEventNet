@@ -25,6 +25,7 @@ Thumbs.db
 *.tdms
 
 data/
+output/
 
 # compiled コード
 *.so
