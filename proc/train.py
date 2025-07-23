@@ -173,7 +173,7 @@ noise_data = (noise_data - np.mean(noise_data, axis=2, keepdims=True)) / np.std(
 	noise_data, axis=2, keepdims=True
 )
 
-save_dir = Path('/workspace/output/_test_train_norm')
+save_dir = Path('/workspace/output/train')
 
 n = 0
 test_range = (n, n + 130)  # 10%

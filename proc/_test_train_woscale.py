@@ -173,7 +173,7 @@ noise_file = data_dir + '/extract_noise_2s.npy'
 event_data = np.load(event_file)
 noise_data = np.load(noise_file)
 
-save_dir = Path('/workspace/output/train')
+save_dir = Path('/workspace/output/_test_train_norm')
 
 # reverse the order of event new_event first
 event_data = event_data[::-1]
