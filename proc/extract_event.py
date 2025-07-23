@@ -148,4 +148,10 @@ np.save(
 	'/workspace/data/extract_event_2s_float16.npy',
 	extract_events.astype(np.float16),
 )
+
+np.save(
+	'/workspace/data/extract_event_2s_example.npy',
+	extract_events[:10],
+)
+
 # %%
