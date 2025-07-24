@@ -14,10 +14,10 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from build_model import build_model
 from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
+from util.build_model import build_model
 
 # ---------------------------
 # Torch Dataset & Model
