@@ -154,23 +154,51 @@ def consume_files():
 	win_gen = window_generator(file_queue, fs, win_sec=2, overlap=0.0, n_ch=1021)
 
 	pbar = tqdm(total=None, bar_format='{l_bar}{bar}| {n_fmt} win  {postfix}')
-	for win, ts_jst in win_gen:
-		# --- 進捗バー用の時刻 (JST) ---
-		ts_str = ts_jst.strftime('%Y-%m-%d %H:%M:%S')  # ここでそのまま文字列化
-		pbar.set_postfix_str(ts_str)
-		pbar.update()
 
-		# --- 前処理 & 推論 ---
-		win = (win - win.mean(axis=1, keepdims=True)) / win.std(axis=1, keepdims=True)
-		win_tensor = (
-			torch.tensor(win, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(device)
+	BATCH = 64  # 最大バッチ
+	FLUSH_SECS = 1.0  # これ以上待たない
+	pending = []
+	last_flush = time.time()
+
+	for win, ts in win_gen:
+		# ---- 前処理してバッファに追加 ----
+		win = (win - win.mean(1, keepdims=True)) / win.std(1, keepdims=True)
+		pending.append((win, ts))
+		# ---- フラッシュ条件判定 ----
+		reach_batch = len(pending) >= BATCH
+		reach_time = (time.time() - last_flush) >= FLUSH_SECS
+
+		if not (reach_batch or reach_time):
+			continue  # まだ溜める
+
+		# ==============================
+		# ここで pending をまとめて推論
+		# ==============================
+		batch_x = (
+			torch.tensor(np.stack([w for w, _ in pending]), dtype=torch.float32)
+			.unsqueeze(1)
+			.to(device)
 		)
+
 		with torch.no_grad():
-			pred = model(win_tensor)
-		if torch.sigmoid(pred).item() > 0.5:
-			plt.imshow(win, aspect='auto', cmap='seismic', vmin=-1, vmax=1)
-			plt.show()
-			time.sleep(1)
+			preds = torch.sigmoid(model(batch_x)).cpu().numpy()
+
+		for (w, ts), p in zip(pending, preds, strict=False):
+			if p > 0.5:
+				plt.imshow(w, aspect='auto', cmap='seismic', vmin=-1, vmax=1)
+				plt.title(ts.strftime('%F %T'))
+				plt.show()
+
+		# ---- 結果処理 ----
+		# ---- tqdm 更新 ----
+		ts_first = pending[0][1].strftime('%Y-%m-%d %H:%M:%S')
+		ts_last = pending[-1][1].strftime('%Y-%m-%d %H:%M:%S')
+		pbar.set_postfix_str(f'{ts_first} – {ts_last}')
+		pbar.update(len(pending))
+
+		# ---- 後片付け ----
+		pending.clear()
+		last_flush = time.time()
 
 
 worker = threading.Thread(target=consume_files, daemon=True)
