@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
-from build_model import build_model
+from util.build_model import build_model
 
 
 # Grad-CAM用フック保存用
