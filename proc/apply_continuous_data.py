@@ -10,34 +10,44 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from build_model import build_model
+from tqdm import tqdm
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+
+JST = dt.timezone(dt.timedelta(hours=9))  # ★追加
+
+start_dt = dt.datetime(2022, 4, 22, 16, 0, 0, tzinfo=JST)
+end_dt = dt.datetime(2022, 4, 23, 18, 0, 0, tzinfo=JST)
 
 
 def window_generator(
 	file_queue, fs: int, win_sec: int = 2, overlap: float = 0.0, n_ch: int = 1021
 ):
 	assert 0 <= overlap < 1
-	step = int(win_sec * (1 - overlap) * fs)
-	buf = np.empty((n_ch, 0), dtype=np.float32)  # 残りデータ保持
+	step = int(win_sec * (1 - overlap) * fs)  # サンプル数
+	step_sec = step / fs  # 秒数
+	buf = np.empty((n_ch, 0), dtype=np.float32)
+	current_ts = None  # ← 追加
 
 	while True:
-		# buffer が足りなければ次ファイルを読む
+		# ---------- fill buffer ----------
 		while buf.shape[1] < win_sec * fs:
-			path, gap_sec = file_queue.pop_next(block=True)  # block=True: 無ければ待つ
-			if gap_sec > 0:  # 欠損 → ゼロ埋め
+			ts, path, gap_sec = file_queue.pop_next(block=True)
+			if current_ts is None:
+				current_ts = ts  # 初回のみ基準時刻をセット
+			if gap_sec > 0:
 				missing = np.zeros((n_ch, int(gap_sec * fs)), dtype=np.float32)
 				buf = np.hstack([buf, missing])
-			if path is not None:
-				data = np.load(path, mmap_mode='r')
-				buf = np.hstack([buf, data])
+			data = np.load(path, mmap_mode='r')
+			buf = np.hstack([buf, data])
 
-		# ウィンドウ切り出し
+		# ---------- yield ----------
 		win = buf[:, : win_sec * fs]
-		yield win
+		yield win, current_ts  # ← (窓, UTC 時刻)
 
-		# バッファを前進
+		# ---------- advance ----------
 		buf = buf[:, step:]
+		current_ts += dt.timedelta(seconds=step_sec)
 
 
 # ---------- FileQueue ----------
@@ -52,10 +62,24 @@ class FileQueue(PriorityQueue):
 		if not m:
 			raise ValueError(f'Timestamp not found: {path.name}')
 		ymd, hms = m.groups()
-		return dt.datetime.strptime(ymd + hms, '%Y%m%d%H%M%S')
+		# ① タイムゾーン付き datetime を返す
+		return dt.datetime.strptime(ymd + hms, '%Y%m%d%H%M%S').replace(tzinfo=JST)
 
-	def push(self, path: Path):
-		self.put((self._ts(path), path))
+	def push(
+		self,
+		path: Path,
+		start_dt: dt.datetime | None = None,
+		end_dt: dt.datetime | None = None,
+	):
+		ts = self._ts(path)
+
+		# 時刻フィルタ
+		if start_dt and ts < start_dt:
+			return
+		if end_dt and ts >= end_dt:
+			return
+
+		self.put((ts, path))
 
 	def pop_next(self, block=True, timeout=None):
 		"""* キュー先頭を pop し Path を返す
@@ -73,7 +97,7 @@ class FileQueue(PriorityQueue):
 
 		# 次回比較用に保持
 		self._prev_ts = ts
-		return path, gap_sec
+		return ts, path, gap_sec
 
 
 file_queue = FileQueue()
@@ -82,7 +106,7 @@ file_queue = FileQueue()
 # ---------- 1) 既存ファイルをスキャン ----------
 def scan_existing(data_dir: Path):
 	for p in sorted(data_dir.glob('*.npy')):
-		file_queue.push(p)
+		file_queue.push(p, start_dt, end_dt)
 	print(f'[DirScanner] queued {file_queue.qsize()} existing files')
 
 
@@ -104,7 +128,7 @@ class AddEvent(FileSystemEventHandler):
 	def on_created(self, event):
 		p = Path(event.src_path)
 		if p.suffix == '.npy':
-			file_queue.push(p)
+			file_queue.push(p, start_dt, end_dt)
 			print(f'[FileWatch] new file queued: {p.name}')
 
 
@@ -119,26 +143,31 @@ model = build_model().to(device)
 model_dir = Path('/workspace/output/train')
 model.load_state_dict(torch.load(model_dir / 'best_model.pth', map_location=device))
 model.eval()  # 評価モードに設定
+
+
 plt.figure()
 
 
 # ---------- 3) 連続処理スレッド（例） ----------
 def consume_files():
-	fs = 1000  # 1 kHz
+	fs = 1000
 	win_gen = window_generator(file_queue, fs, win_sec=2, overlap=0.0, n_ch=1021)
-	for win in win_gen:
-		# print(f'[Consumer] Processed window shape: {win.shape}')
-		win = (win - np.mean(win, axis=1, keepdims=True)) / (
-			np.std(win, axis=1, keepdims=True)
-		)
+
+	pbar = tqdm(total=None, bar_format='{l_bar}{bar}| {n_fmt} win  {postfix}')
+	for win, ts_jst in win_gen:
+		# --- 進捗バー用の時刻 (JST) ---
+		ts_str = ts_jst.strftime('%Y-%m-%d %H:%M:%S')  # ここでそのまま文字列化
+		pbar.set_postfix_str(ts_str)
+		pbar.update()
+
+		# --- 前処理 & 推論 ---
+		win = (win - win.mean(axis=1, keepdims=True)) / win.std(axis=1, keepdims=True)
 		win_tensor = (
 			torch.tensor(win, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(device)
-		)  # (1, 1, H, W)
+		)
 		with torch.no_grad():
 			pred = model(win_tensor)
-		class_idx = int(torch.sigmoid(pred).item() > 0.5)
-		if class_idx == 1:
-			# 標準化
+		if torch.sigmoid(pred).item() > 0.5:
 			plt.imshow(win, aspect='auto', cmap='seismic', vmin=-1, vmax=1)
 			plt.show()
 			time.sleep(1)
