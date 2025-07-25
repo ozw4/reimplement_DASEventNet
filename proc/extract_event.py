@@ -17,60 +17,62 @@ def extract_2s_window(
         seed: int | None = None,
         margin: tuple[int, int] = (100, 1600),
 ) -> np.ndarray:
-        """Extract a 2 s snippet containing the event.
 
-        Parameters
-        ----------
-        data
-                2D array of shape (channels, 15000)
-        t
-                File start time
-        time
-                Event timestamp
-        seed
-                Random seed for reproducibility
-        margin
-                Desired min and max offset of the event in the window
+	"""DAS 15秒データからイベントを含む2秒間 (2000サンプル) を抽出。
+	イベントが [margin[0], margin[1]] の範囲に収まるように切り出す。
+	範囲に収まらない場合は margin を無視して通常抽出にフォールバック。
 
-        Returns
-        -------
-        np.ndarray
-                Extracted snippet of length 2000
+	Parameters
+	----------
+	data : np.ndarray
+	    1D array (長さ15000を想定)
+	t : datetime
+	    ファイル開始時刻
+	time : datetime
+	    イベント時刻
+	seed : int | None
+	    ランダムシード
+	margin : tuple[int, int]
+	    ウィンドウ内でイベントが来てほしい相対位置（サンプル）
 
-        """
-        if seed is not None:
-                np.random.seed(seed)
+	Returns
+	-------
+	np.ndarray
+	    長さ2000のスニペット
 
-        sampling_rate = 1000
-        total_samples = 15000
-        window_size = 2000
-        min_margin, max_margin = margin
+	"""
+	if seed is not None:
+		np.random.seed(seed)
 
-        offset_sec = (time - t).total_seconds()
-        event_idx = int(round(offset_sec * sampling_rate))
+	sampling_rate = 1000
+	total_samples = 15000
+	window_size = 2000
+	min_margin, max_margin = margin
 
-        if not (0 <= event_idx < total_samples):
-                raise ValueError(f'イベント時刻がファイル範囲外: event_idx={event_idx}')
+	offset_sec = (time - t).total_seconds()
+	event_idx = int(round(offset_sec * sampling_rate))
 
-        # margin を考慮した切り出し範囲
-        min_start = max(0, event_idx - max_margin)
-        max_start = min(total_samples - window_size, event_idx - min_margin)
+	if not (0 <= event_idx < total_samples):
+		raise ValueError(f'イベント時刻がファイル範囲外: event_idx={event_idx}')
 
-        if min_start <= max_start:
-                # 通常：イベントが margin 内に収まるようランダムに開始位置を決定
-                start_idx = np.random.randint(min_start, max_start + 1)
-        else:
-                # フォールバック：イベントを含む範囲で通常抽出
-                min_start = max(0, event_idx - window_size + 1)
-                max_start = min(event_idx, total_samples - window_size)
-                if min_start > max_start:
-                        raise ValueError(f'イベント位置が不正: event_idx={event_idx}')
-                        print(t)
-                        print(time)
-                start_idx = np.random.randint(min_start, max_start + 1)
+	# margin を考慮した切り出し範囲
+	min_start = max(0, event_idx - max_margin)
+	max_start = min(total_samples - window_size, event_idx - min_margin)
 
-        return data[:, start_idx : start_idx + window_size]
+	if min_start <= max_start:
+		# 通常：イベントが margin 内に収まるようランダムに開始位置を決定
+		start_idx = np.random.randint(min_start, max_start + 1)
+	else:
+		# フォールバック：イベントを含む範囲で通常抽出
+		min_start = max(0, event_idx - window_size + 1)
+		max_start = min(event_idx, total_samples - window_size)
+		if min_start > max_start:
+			print(t)
+			print(time)
+			raise ValueError(f'イベント位置が不正: event_idx={event_idx}')
+		start_idx = np.random.randint(min_start, max_start + 1)
 
+	return data[:, start_idx : start_idx + window_size]
 
 silixa_event_file = '/workspace/data/silixa/FORGE_DFIT_NAV.csv'
 event_df = pd.read_csv(
@@ -152,4 +154,4 @@ np.save(
         extract_events[:10],
 )
 
-# %%
+
