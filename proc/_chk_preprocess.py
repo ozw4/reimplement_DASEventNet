@@ -50,30 +50,30 @@ import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots(1, 3, figsize=(15, 6), sharey=True)
 ax[0].imshow(
-	downsampled_seis78B[:, 7000:9000],
-	aspect='auto',
-	cmap='seismic',
-	interpolation='none',
-	vmin=-scale,
-	vmax=scale,
+        downsampled_seis78B[:, 7000:9000],
+        aspect='auto',
+        cmap='seismic',
+        interpolation='none',
+        vmin=-scale,
+        vmax=scale,
 )
 ax[0].set_title('Downsampled Seis 78B')
 ax[1].imshow(
-	filtered_seis78B[:, 7000:9000],
-	aspect='auto',
-	cmap='seismic',
-	interpolation='none',
-	vmin=-scale,
-	vmax=scale,
+        filtered_seis78B[:, 7000:9000],
+        aspect='auto',
+        cmap='seismic',
+        interpolation='none',
+        vmin=-scale,
+        vmax=scale,
 )
 ax[1].set_title('bandpass (25-150 Hz)')
 ax[2].imshow(
-	denoised_seis78B[:, 7000:9000],
-	aspect='auto',
-	cmap='seismic',
-	interpolation='none',
-	vmin=-scale,
-	vmax=scale,
+        denoised_seis78B[:, 7000:9000],
+        aspect='auto',
+        cmap='seismic',
+        interpolation='none',
+        vmin=-scale,
+        vmax=scale,
 )
 ax[2].set_title('median filtered')
 plt.suptitle(f'{nptdms_file.stem} 78B')
