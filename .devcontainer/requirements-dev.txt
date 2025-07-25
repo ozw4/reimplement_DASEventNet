@@ -30,3 +30,4 @@ deepwave
 hydra-core
 omegaconf
 nptdms
+watchdog
