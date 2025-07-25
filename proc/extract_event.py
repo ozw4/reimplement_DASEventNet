@@ -66,9 +66,9 @@ def extract_2s_window(
 		min_start = max(0, event_idx - window_size + 1)
 		max_start = min(event_idx, total_samples - window_size)
 		if min_start > max_start:
-			raise ValueError(f'イベント位置が不正: event_idx={event_idx}')
 			print(t)
 			print(time)
+			raise ValueError(f'イベント位置が不正: event_idx={event_idx}')
 		start_idx = np.random.randint(min_start, max_start + 1)
 
 	return data[:, start_idx : start_idx + window_size]
