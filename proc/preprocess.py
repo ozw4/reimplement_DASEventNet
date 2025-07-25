@@ -3,23 +3,9 @@ import pathlib as Path
 
 import numpy as np
 from nptdms import TdmsFile
-from scipy.signal import butter, filtfilt, resample_poly
+from scipy.signal import resample_poly
 
-
-def bandpass_filter(
-        data: np.ndarray,
-        fs: int = 1000,
-        lowcut: float = 25,
-        highcut: float = 150,
-        order: int = 4,
-) -> np.ndarray:
-        """Apply a Butterworth band-pass filter."""
-        nyq = 0.5 * fs
-        low = lowcut / nyq
-        high = highcut / nyq
-        b, a = butter(order, [low, high], btype='band')
-        return filtfilt(b, a, data, axis=1)
-
+from proc.util.filters import bandpass_filter
 
 data_dir = Path.Path('/workspace/data/silixa')
 
