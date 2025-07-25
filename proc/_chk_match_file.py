@@ -1,11 +1,12 @@
+# %%
 import re
 from pathlib import Path
 
 # === 設定 ===
 txt_path = Path(
-	'~/Desktop/daseventnet/data/silixa/get_silixa_raw_tdms_april_2022.txt'
+	'/workspace/data/silixa/get_silixa_raw_tdms_april_2022.txt'
 ).expanduser()
-npy_dir = Path('~/Desktop/daseventnet/data/silixa/raw_78B_npy').expanduser()
+npy_dir = Path('/workspace/data/silixa/raw_78B_npy').expanduser()
 
 # === .tdms 側: ベース名を収集 ===
 tdms_bases: set[str] = set()
@@ -36,3 +37,5 @@ for b in sorted(missing_npy):
 print(f'\n◆ .npy だけ存在するもの: {len(orphaned_npy)} 件')
 for b in sorted(orphaned_npy):
 	print('  ', b)
+
+# %%
