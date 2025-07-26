@@ -18,6 +18,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 from util.build_model import build_model
+from util.data import load_event_noise, split_data
 
 # ---------------------------
 # Torch Dataset & Model
@@ -158,61 +159,12 @@ def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> tupl
 
 # def main():
 # Paths
-data_dir = '/workspace/data'
-event_file = data_dir + '/extract_event_2s.npy'
-noise_file = data_dir + '/extract_noise_2s.npy'
-
-event_data = np.load(event_file)
-noise_data = np.load(noise_file)
+data_dir = Path('/workspace/data')
+event_data, noise_data = load_event_noise(data_dir)
 
 save_dir = Path('/workspace/output/_test_train_norm')
 
-# reverse the order of event new_event first
-event_data = event_data[::-1]
-noise_data = noise_data[::-1]
-
-n = 0
-test_range = (n, n + 130)  # 10%
-valid_range = (n + 130, n + 130 + 193)  # 15%
-train_range = (n + 130 + 193, len(event_data))  # 75%
-
-x_train = np.vstack(
-        (
-                event_data[train_range[0] : train_range[1]],
-                noise_data[train_range[0] : train_range[1]],
-        )
-)
-x_test = np.vstack(
-        (
-                event_data[test_range[0] : test_range[1]],
-                noise_data[test_range[0] : test_range[1]],
-        )
-)
-x_valid = np.vstack(
-        (
-                event_data[valid_range[0] : valid_range[1]],
-                noise_data[valid_range[0] : valid_range[1]],
-        )
-)
-
-y_train = np.concatenate(
-        (
-                np.ones(len(event_data[train_range[0] : train_range[1]])),
-                np.zeros(len(noise_data[train_range[0] : train_range[1]])),
-        )
-)
-y_test = np.concatenate(
-        (
-                np.ones(len(event_data[test_range[0] : test_range[1]])),
-                np.zeros(len(noise_data[test_range[0] : test_range[1]])),
-        )
-)
-y_valid = np.concatenate(
-        (
-                np.ones(len(event_data[valid_range[0] : valid_range[1]])),
-                np.zeros(len(noise_data[valid_range[0] : valid_range[1]])),
-        )
-)
+x_train, y_train, x_valid, y_valid, x_test, y_test = split_data(event_data, noise_data)
 
 # Build datasets & loaders
 batch_size = 16
